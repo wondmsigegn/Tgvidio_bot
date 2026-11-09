@@ -1,0 +1,40 @@
+services:
+  # Self-hosted Telegram Bot API server: lifts the bot upload limit from 50 MB to 2000 MB.
+  # Needs TELEGRAM_API_ID / TELEGRAM_API_HASH from https://my.telegram.org (put them in .env).
+  telegram-bot-api:
+    image: aiogram/telegram-bot-api:latest
+    container_name: tg-bot-api
+    restart: unless-stopped
+    environment:
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:?set TELEGRAM_API_ID in .env}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:?set TELEGRAM_API_HASH in .env}
+      TELEGRAM_LOCAL: "1"
+    volumes:
+      - telegram-bot-api-data:/var/lib/telegram-bot-api
+
+  bot:
+    build: .
+    container_name: tg-video-bot
+    restart: unless-stopped
+    depends_on:
+      - telegram-bot-api
+    env_file: .env
+    environment:
+      DATA_DIR: /app/data
+      BOT_API_URL: http://telegram-bot-api:8081
+      MAX_UPLOAD_MB: "2000"
+    volumes:
+      - ./data:/app/data
+      # Lets the bot read files Telegram hands over in local mode (e.g. uploaded cookies.txt).
+      - telegram-bot-api-data:/var/lib/telegram-bot-api:ro
+    # Large videos are merged/remuxed with FFmpeg - give it some room.
+    mem_limit: 2g
+    cpus: 2
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  telegram-bot-api-data:
